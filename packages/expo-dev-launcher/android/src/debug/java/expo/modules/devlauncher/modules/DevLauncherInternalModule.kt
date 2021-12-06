@@ -153,11 +153,13 @@ class DevLauncherInternalModule(reactContext: ReactApplicationContext?)
 //    val runtimeVersion = applicationInfo.metaData.getString("expo.modules.updates.EXPO_RUNTIME_VERSION")
 //    val sdkVersion = applicationInfo.metaData.getString("expo.modules.updates.EXPO_UPDATES_SDK_VERSION")
 
-    map.putString("appVersion", packageInfo.versionName)
-    map.putString("appName", appName.toString())
-    map.putString("appIcon", "")
-    map.putString("EXUpdatesRuntimeVersion","")
-    map.putString("EXUpdatesSDKVersion", "")
+    map.apply {
+      putString("appVersion", packageInfo.versionName)
+      putString("appName", appName.toString())
+      putString("appIcon", "")
+      putString("EXUpdatesRuntimeVersion","")
+      putString("EXUpdatesSDKVersion", "")
+    }
 
     promise.resolve(map)
   }
