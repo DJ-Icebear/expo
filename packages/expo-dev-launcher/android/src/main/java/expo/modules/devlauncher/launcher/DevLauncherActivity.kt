@@ -43,8 +43,6 @@ class DevLauncherActivity : ReactActivity(), ReactInstanceManager.ReactInstanceE
     }
   }
 
-
-
   override fun onStart() {
     overridePendingTransition(0, 0)
     super.onStart()
