@@ -8,7 +8,6 @@ import expo.modules.devlauncher.modules.DevLauncherDevMenuExtensions
 import expo.modules.devlauncher.modules.DevLauncherInternalModule
 import expo.modules.devlauncher.modules.DevLauncherModule
 
-
 class DevLauncherPackage : ReactPackage {
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
     listOf(
