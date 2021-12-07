@@ -90,14 +90,14 @@ abstract class AssetDao {
   fun mergeAndUpdateAsset(existingEntity: AssetEntity, newEntity: AssetEntity) {
     // if the existing entry came from an embedded manifest, it may not have a URL in the database
     var shouldUpdate = false
-    if ((newEntity.url != null && existingEntity.url == null) || newEntity.url != existingEntity.url) {
+    if (newEntity.url != null && (existingEntity.url == null || newEntity.url != existingEntity.url)) {
       existingEntity.url = newEntity.url
       shouldUpdate = true
     }
 
-    if (
-      (newEntity.extraRequestHeaders != null && existingEntity.extraRequestHeaders == null) ||
-      newEntity.extraRequestHeaders?.equals(existingEntity.extraRequestHeaders) == false
+    val newEntityExtraRequestHeaders = newEntity.extraRequestHeaders
+    if (newEntityExtraRequestHeaders != null &&
+      (existingEntity.extraRequestHeaders == null || newEntityExtraRequestHeaders != existingEntity.extraRequestHeaders)
     ) {
       existingEntity.extraRequestHeaders = newEntity.extraRequestHeaders
       shouldUpdate = true

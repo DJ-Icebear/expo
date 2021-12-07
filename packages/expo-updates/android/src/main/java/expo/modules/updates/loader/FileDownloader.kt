@@ -13,7 +13,6 @@ import expo.modules.updates.manifest.ManifestFactory
 import expo.modules.updates.manifest.UpdateManifest
 import expo.modules.updates.selectionpolicy.SelectionPolicies
 import okhttp3.*
-import okio.Buffer
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -21,6 +20,10 @@ import java.io.File
 import java.io.IOException
 import java.util.*
 import kotlin.math.min
+import org.apache.commons.fileupload.MultipartStream
+import org.apache.commons.fileupload.ParameterParser
+import java.io.ByteArrayOutputStream
+
 
 open class FileDownloader(context: Context) {
   private val client = OkHttpClient.Builder().cache(getCache(context)).build()
@@ -84,50 +87,70 @@ open class FileDownloader(context: Context) {
 
   internal fun parseManifestResponse(response: Response, configuration: UpdatesConfiguration, callback: ManifestDownloadCallback) {
     val contentType = response.header("content-type") ?: ""
-    val regex = Regex("multipart/.*boundary=\"?([^\"]+)\"?")
-    val matchResult = regex.matchEntire(contentType)
-    if (matchResult !== null) {
-      val boundary = matchResult.groupValues[1]
-      parseMultipartManifestResponse(response, boundary, configuration, callback)
+    val isMultipart = contentType.startsWith("multipart/", ignoreCase = true)
+    if (isMultipart) {
+      val boundaryParameter = ParameterParser().parse(contentType, ';')["boundary"]
+      if (boundaryParameter == null) {
+        callback.onFailure(
+          "Missing boundary in multipart manifest content-type",
+          IOException("Missing boundary in multipart manifest content-type")
+        )
+        return
+      }
+
+      parseMultipartManifestResponse(response, boundaryParameter, configuration, callback)
     } else {
       parseManifest(response.body()!!.string(), response.headers(), null, configuration, callback)
     }
   }
 
-  private fun parseMultipartManifestResponse(response: Response, boundary: String, configuration: UpdatesConfiguration, callback: ManifestDownloadCallback) {
-    val bodyReader = ExpoMultipartStreamReader(
-      response.body()!!.source(),
-      boundary
-    )
+  private fun parseHeaders(text: String): Headers {
+    val headers = mutableMapOf<String, String>()
+    val lines = text.split(CRLF)
+    for (line in lines) {
+      val indexOfSeparator = line.indexOf(":")
+      if (indexOfSeparator == -1) {
+        continue
+      }
+      val key = line.substring(0, indexOfSeparator).trim()
+      val value = line.substring(indexOfSeparator + 1).trim()
+      headers[key] = value
+    }
+    return Headers.of(headers)
+  }
 
+  private fun parseMultipartManifestResponse(response: Response, boundary: String, configuration: UpdatesConfiguration, callback: ManifestDownloadCallback) {
     var manifestBodyAndHeaders: Pair<String, Headers>? = null
     var extensionsBody: String? = null
 
-    val contentDispositionNameFieldRegex = Regex(".*name=\"?([^\"]+)\"?")
+    val multipartStream = MultipartStream(response.body()!!.byteStream(), boundary.toByteArray())
 
-    val completed = bodyReader.readAllParts(
-      object : ExpoMultipartStreamReader.ChunkListener {
-        @Throws(IOException::class)
-        override fun onChunkComplete(
-          headers: Map<String, String>?,
-          body: Buffer,
-          isLastChunk: Boolean
-        ) {
-          val headersLocal = headers?.let { Headers.of(it) }
-          val contentDisposition = headersLocal?.get("content-disposition") ?: return
-          when (contentDispositionNameFieldRegex.matchEntire(contentDisposition)?.groupValues?.get(1)) {
-            "manifest" -> manifestBodyAndHeaders = Pair(body.readUtf8(), headersLocal)
-            "extensions" -> extensionsBody = body.readUtf8()
+    try {
+      var nextPart = multipartStream.skipPreamble()
+      while (nextPart) {
+        val headers = parseHeaders(multipartStream.readHeaders())
+
+        // always read the body to progress the reader
+        val output = ByteArrayOutputStream()
+        multipartStream.readBodyData(output)
+
+        val contentDispositionValue = headers.get("content-disposition")
+        if (contentDispositionValue != null) {
+          val contentDispositionParameterMap = ParameterParser().parse(contentDispositionValue, ';')
+          val contentDispositionName = contentDispositionParameterMap["name"]
+          if (contentDispositionName != null) {
+            when (contentDispositionName) {
+              "manifest" -> manifestBodyAndHeaders = Pair(output.toString(), headers)
+              "extensions" -> extensionsBody = output.toString()
+            }
           }
         }
-
-        override fun onChunkProgress(headers: Map<String, String>, loaded: Long, total: Long) {}
-      })
-
-    if (!completed) {
+        nextPart = multipartStream.readBoundary()
+      }
+    } catch (e: Exception) {
       callback.onFailure(
         "Error while reading multipart manifest response",
-        IOException("Could not read multipart manifest response")
+        e
       )
       return
     }
@@ -147,7 +170,7 @@ open class FileDownloader(context: Context) {
       return
     }
 
-    parseManifest(manifestBodyAndHeaders!!.first, manifestBodyAndHeaders!!.second, extensions, configuration, callback)
+    parseManifest(manifestBodyAndHeaders.first, manifestBodyAndHeaders.second, extensions, configuration, callback)
   }
 
   private fun parseManifest(manifestBody: String, manifestHeaders: Headers, extensions: JSONObject?, configuration: UpdatesConfiguration, callback: ManifestDownloadCallback) {
@@ -316,6 +339,9 @@ open class FileDownloader(context: Context) {
 
   companion object {
     private val TAG = FileDownloader::class.java.simpleName
+
+    // Standard line separator for HTTP.
+    private const val CRLF = "\r\n"
 
     @Throws(Exception::class)
     private fun createManifest(

@@ -374,7 +374,7 @@ class UpdatesDatabaseMigrationTest {
     db.close()
 
     // Re-open the database with version 8 and provide
-    // MIGRATION_7_8 as the migration process.
+    // MIGRATION_8_9 as the migration process.
     db = helper.runMigrationsAndValidate(TEST_DB, 9, true, UpdatesDatabase.MIGRATION_8_9)
     db.execSQL("PRAGMA foreign_keys=ON")
 

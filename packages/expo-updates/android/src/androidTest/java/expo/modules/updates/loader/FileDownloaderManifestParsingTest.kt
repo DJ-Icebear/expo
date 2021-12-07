@@ -62,11 +62,21 @@ class FileDownloaderManifestParsingTest {
     val boundary = "blah"
     val contentType = "multipart/mixed; boundary=$boundary"
 
+    val extensions = "{}"
+
     val multipartBody = MultipartBody.Builder(boundary)
       .setType(MultipartBody.MIXED)
       .addPart(
-        Headers.of(mapOf("Content-Disposition" to "form-data; name=\"manifest\"")),
+        Headers.of(mapOf("Content-Disposition" to "form-data; name=\"extraneous\"; filename=\"hello1\"")),
+        RequestBody.create(MediaType.parse("text/plain; charset=utf-8"), "hello")
+      )
+      .addPart(
+        Headers.of(mapOf("Content-Disposition" to "form-data; name=\"manifest\"; filename=\"hello2\"")),
         RequestBody.create(MediaType.parse("application/json; charset=utf-8"), classicJSON)
+      )
+      .addPart(
+        Headers.of(mapOf("Content-Disposition" to "form-data; name=\"extensions\"; filename=\"hello3\"")),
+        RequestBody.create(MediaType.parse("application/json; charset=utf-8"), extensions)
       )
       .build()
 
