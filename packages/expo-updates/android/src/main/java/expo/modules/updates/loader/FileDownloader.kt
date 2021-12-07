@@ -24,7 +24,6 @@ import org.apache.commons.fileupload.MultipartStream
 import org.apache.commons.fileupload.ParameterParser
 import java.io.ByteArrayOutputStream
 
-
 open class FileDownloader(context: Context) {
   private val client = OkHttpClient.Builder().cache(getCache(context)).build()
 
