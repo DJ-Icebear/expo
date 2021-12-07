@@ -4,7 +4,7 @@ import downloadTarball from 'download-tarball';
 import ejs from 'ejs';
 import fs from 'fs-extra';
 import path from 'path';
-import prompts from 'prompts';
+import prompts, { PromptObject } from 'prompts';
 
 const packageJson = require('../package.json');
 
@@ -170,70 +170,60 @@ async function askForSubstitutionDataAsync(
     .replace(/^./, (match) => match.toUpperCase())
     .replace(/\W+(\w)/g, (_, p1) => p1.toUpperCase());
 
-  const { slug } = options.target
-    ? { slug: defaultPackageSlug }
-    : await prompts({
-        type: 'text',
-        name: 'slug',
-        message: 'What is the package slug?',
-        initial: defaultPackageSlug,
-      });
+  const promptQueries: PromptObject[] = [
+    {
+      type: 'text',
+      name: 'target',
+      message: 'What is the package slug?',
+      initial: defaultPackageSlug,
+    },
+    {
+      type: 'text',
+      name: 'name',
+      message: 'What is the project name?',
+      initial: defaultProjectName,
+    },
+    {
+      type: 'text',
+      name: 'description',
+      message: 'How would you describe the module?',
+    },
+    {
+      type: 'text',
+      name: 'package',
+      message: 'What is the Android package name?',
+      initial: `expo.modules.${defaultPackageSlug.replace(/\W/g, '').toLowerCase()}`,
+    },
+    {
+      type: 'text',
+      name: 'author',
+      message: 'Who is the author?',
+      initial: (await npmWhoamiAsync(targetDir)) ?? '',
+    },
+    {
+      type: 'text',
+      name: 'license',
+      message: 'What is the license?',
+      initial: 'MIT',
+    },
+    {
+      type: 'text',
+      name: 'repo',
+      message: 'What is the repository URL?',
+    },
+  ];
 
-  const { name } = options.name
-    ? options
-    : await prompts({
-        type: 'text',
-        name: 'name',
-        message: 'What is the project name?',
-        initial: defaultProjectName,
-      });
+  const answers: Record<string, string> = {};
+  for (const query of promptQueries) {
+    const name = query.name.toString();
+    answers[name] = options[name] ?? (await prompts(query));
+  }
 
-  const { description } = options.description
-    ? options
-    : await prompts({
-        type: 'text',
-        name: 'description',
-        message: 'How would you describe the module?',
-      });
-
-  const { package: projectPackage } = options.package
-    ? options
-    : await prompts({
-        type: 'text',
-        name: 'package',
-        message: 'What is the Android package name?',
-        initial: `expo.modules.${defaultPackageSlug.replace(/\W/g, '').toLowerCase()}`,
-      });
-
-  const { author } = options.author
-    ? options
-    : await prompts({
-        type: 'text',
-        name: 'author',
-        message: 'Who is the author?',
-        initial: (await npmWhoamiAsync(targetDir)) ?? '',
-      });
-
-  const { license } = options.license
-    ? options
-    : await prompts({
-        type: 'text',
-        name: 'license',
-        message: 'What is the license?',
-        initial: 'MIT',
-      });
-
-  const { repo } = options.repo
-    ? options
-    : await prompts({
-        type: 'text',
-        name: 'repo',
-        message: 'What is the repository URL?',
-      });
+  const { target, name, description, package: projectPackage, author, license, repo } = answers;
 
   return {
     project: {
-      slug,
+      slug: target,
       name,
       version: '0.1.0',
       description,
